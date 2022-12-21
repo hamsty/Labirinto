@@ -1,3 +1,6 @@
 [submodule "lib/Cursor_12x12"]
 	path = lib/Cursor_12x12
 	url = https://github.com/hamsty/Cursor_12x12
+[submodule "lib/Led_Table_NxN"]
+	path = lib/Led_Table_NxN
+	url = https://github.com/hamsty/Led_Table_NxN
