@@ -6,16 +6,36 @@
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #endif
+#include <Cursor12x12.h>
 #include <Adafruit_NeoPixel.h>
 #include <SPIFFS.h>
 #include <FS.h>
 #include <gamesirg3s.h>
+
+using namespace std;
+
+#define NUM_SPACE 48
+#define DATAPIN 15
+#define GAME_VELOCITY 100
+#define START pair<int, int>(1, 5)
+#define END pair<int, int>(NUM_SPACE - 2, NUM_SPACE - 2 - 5)
+#define CHARCOLOR 0xFFE0U
+#define FINALRGB565 0xF800
 
 #if MESA == 0
 const char *casa = "Talles";
 const char *senha = "talles12345";
 static AsyncWebServer server(80);
 #endif
+
+static JoystickClient *client;
+
+static bool jogoIniciado = false;
+static bool jogoTerminado = false;
+
+static Cursor12x12 display(NUM_SPACE, DATAPIN, NEO_GRB + NEO_KHZ800);
+static pair<int, int> posicao;
+static pair<int, int> posicaoAnterior;
 
 void drawImage(int16_t x, int16_t y, String file)
 {
@@ -89,7 +109,102 @@ void setup()
   Serial.println("Joystick Achado!");
 }
 
+void initJogo()
+{
+  drawImage(1, 1, "/labirinto.bin");
+  display.drawRect(0, 0, NUM_SPACE, NUM_SPACE, 0x0000);
+  display.drawPixel(END.first, END.second, FINALRGB565);
+  posicao = START;
+  display.drawPixel(posicao.first, posicao.second, CHARCOLOR);
+  display.setCursorPos(0, 0);
+}
+
+bool canMove(int16_t x, int16_t y)
+{
+  if (display.getPixel(x, y) == 0x0000)
+  {
+    return false;
+  }
+  return true;
+}
+
+void moveChar()
+{
+  display.drawPixel(posicaoAnterior.first, posicaoAnterior.second, 0xFFFF);
+  display.drawPixel(posicao.first, posicao.second, CHARCOLOR);
+  display.setCursorPos(posicao.first - 5, posicao.second - 5);
+}
+
+void layerWin()
+{
+  display.fillScreen(0X00);
+  drawImage(0, 0, "/trofeu.bin");
+}
+
+void andar()
+{
+  pair<int, int> xy = client->getXY();
+  int x = xy.first;
+  int y = xy.second;
+  posicaoAnterior = posicao;
+  posicao = {posicao.first + x, posicao.second + y};
+  if (canMove(posicao.first, posicao.second))
+  {
+    if (posicaoAnterior != posicao)
+    {
+      moveChar();
+    }
+    if (posicao == END)
+    {
+      jogoTerminado = true;
+      layerWin();
+    }
+    if (client->bPressed())
+    {
+      jogoIniciado = false;
+    }
+  }
+  else
+  {
+    posicao = posicaoAnterior;
+  }
+}
+
+unsigned long tempo = 0;
+
 void loop()
 {
-  // put your main code here, to run repeatedly:
+  if (!client->isConnected())
+  {
+    client->connectToServer();
+  }
+  else
+  {
+    if (!jogoIniciado)
+    {
+      Serial.println("Jogo Iniciado!");
+      jogoIniciado = true;
+      initJogo();
+    }
+    else
+    {
+      client->update();
+      if (!jogoTerminado)
+      {
+        andar();
+      }
+      else
+      {
+        if (client->bPressed() || client->aPressed())
+        {
+          jogoTerminado = false;
+          jogoIniciado = false;
+        }
+      }
+    }
+#if MESA == 1
+    display.show();
+#endif
+    delay(GAME_VELOCITY);
+  }
 }
