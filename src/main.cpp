@@ -139,6 +139,7 @@ void layerWin()
 {
   display.fillScreen(0X00);
   drawImage(0, 0, "/trofeu.bin");
+  display.setCursorPos(0,0);
 }
 
 void andar()
